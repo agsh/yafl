@@ -1,45 +1,86 @@
-/**
- * Created with JetBrains WebStorm.
- * User: dev
- * Date: 06.12.12
- * Time: 13:34
- * To change this template use File | Settings | File Templates.
- */
+var config = require('../lib/config.js')
+    , globals = require('cache')
+    , sqlite3 = require('sqlite3').verbose()
+    , _ = require('../lib/return.js')
+    ;
 
-var _ = require('../lib/return.js');
+var treeData = new globals.Cache();
+treeData.open(config.globalsDBconfig, function(error, result){
+        if (error) {
+            console.log(error);
+        }
+        //console.log(result);
+    }
+);
+
+var db = new sqlite3.Database(config.sqlite3config.path);
+var prepare = db.prepare('SELECT * FROM words');
+
+treeData.kill({ global: 'tree' });
+treeData.set('tree', 'node_1', 'value_1');
+treeData.set('tree', 'node_1', 'value_2');
+treeData.set('tree', 'node_2', 'value_3');
+treeData.set('tree', 'node_3', 'value_4');
+
+treeData._cacheInstance = true;
+treeData._global = 'tree';
+treeData._subscripts = [];
 
 exports.checkType = function(test) {
 	var array = _.return([1,2,3,4,5])
 		, obj = _.return({a:1,b:2,c:3,d:4,e:5})
 		, number = _.return(666)
 		, list = _.return('[1..5]')
+        , tree = _.return({ _cacheInstance : true })
+        , table = _.return({ _sqlInstance : true })
 		;
 
 	test.equal(array._type, 0);
 	test.equal(obj._type, 1);
 	test.equal(number._type, 3);
 	test.equal(list._type, 2);
+    test.equal(tree._type, 4);
+    test.equal(table._type, 5);
 
 	test.done();
 };
 
 exports.checkNextValue = function(test) {
+
+
+
 	var array = _.return([1,2,3,4,5])
 		, obj = _.return({a:2,b:4,c:6,d:8,e:10})
 		, number = _.return(666)
 		, list = _.return('[2..5]')
-		;
+        , tree = _.return(treeData)
+        ;
 
-	array.init(); obj.init(); number.init(2); list.init();
+	array.init(); obj.init(); number.init(2); list.init(); tree.init();
 
-	array.next(); obj.next(); number.next(); list.next();
+	array.next(); obj.next(); number.next(); list.next(); tree.next();
 
 	test.equal(array.value(), 2);
 	test.equal(obj.value(), 4);
 	test.equal(number.value(), 668);
 	test.equal(list.value(), 3);
+    test.deepEqual(tree.value()._subscripts, ['node_2']);
 
-	test.done();
+    prepare.all(function(err, rows) {
+        var statement = {};
+        statement.rows = rows;
+        statement._sqlInstance = true;
+
+        table = _.return(statement);
+        table.init();
+        table.next();
+
+        test.deepEqual(table.value(), { id_word: 2, word: 'SQL' });
+
+    });
+
+    test.done()
+
 };
 
 exports.checkForEach = function(test) {
@@ -214,4 +255,34 @@ exports.checkSequence = function(test) {
 	var seq3 = _.return('[1..5]');
 	test.deepEqual(seq3.toArray(), [1,2,3,4,5]);
 	test.done();
+};
+
+exports.checkTree = function(test) {
+    treeData._cacheInstance = true;
+    treeData._global = 'tree';
+    treeData._subscripts = [];
+
+    _.return(treeData).mapNow(function(node) {
+        console.log(node);
+    });
+
+    treeData.close();
+    test.done();
+
+};
+
+exports.checkTable = function(test) {
+    prepare.all(function(err, rows) {
+        var statement = {};
+        statement.rows = rows;
+        statement._sqlInstance = true;
+
+        _.return(statement).mapNow(function(row) {
+            console.log(row);
+        });
+
+        test.done();
+
+    });
+
 };
